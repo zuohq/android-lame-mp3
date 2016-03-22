@@ -5,7 +5,7 @@ import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.util.Log;
 
-import com.martin.library.Mp3Encoder;
+import com.martin.library.Encoder;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -38,7 +38,7 @@ public class AudioRecordHandler implements Runnable {
      * 音频源：指的是从哪里采集音频。这里我们当然是从麦克风采集音频，所以此参数的值为MIC
      */
     private static final int AUDIOSOURCE = MediaRecorder.AudioSource.MIC;
-    private Mp3Encoder mp3Encoder;
+    private Encoder encoder;
 
     private AudioRecord audioRecord;
 
@@ -50,9 +50,9 @@ public class AudioRecordHandler implements Runnable {
 
     private Object mutex = new Object();
 
-    public AudioRecordHandler(String filePath, Mp3Encoder mp3Encoder) {
+    public AudioRecordHandler(String filePath) {
         this.filePath = filePath;
-        this.mp3Encoder = mp3Encoder;
+        this.encoder = new Encoder.Builder(44100, 1, 44100, 16).create();
     }
 
     @Override
@@ -85,7 +85,7 @@ public class AudioRecordHandler implements Runnable {
             if (bufferRead > 0) {
 
                 Log.d(TAG, "encoding bytes to mp3 buffer..");
-                int bytesEncoded = mp3Encoder.encode(buffer, buffer, bufferRead, mp3buffer);
+                int bytesEncoded = encoder.encode(buffer, buffer, bufferRead, mp3buffer);
                 Log.d(TAG, "bytes encoded=" + bytesEncoded);
 
                 if (bytesEncoded > 0) {
@@ -99,7 +99,7 @@ public class AudioRecordHandler implements Runnable {
             }
         }
 
-        int outputMp3buf = mp3Encoder.flush(mp3buffer);
+        int outputMp3buf = encoder.flush(mp3buffer);
 
         if (outputMp3buf > 0) {
             try {
@@ -116,7 +116,7 @@ public class AudioRecordHandler implements Runnable {
         audioRecord.stop();
         audioRecord.release();
 
-        mp3Encoder.close();
+        encoder.close();
 
         isRecording = false;
     }
