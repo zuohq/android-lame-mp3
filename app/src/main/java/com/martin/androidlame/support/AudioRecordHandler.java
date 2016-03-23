@@ -46,13 +46,16 @@ public class AudioRecordHandler implements Runnable {
 
     private FileOutputStream outputStream;
 
+    //是否暂停
+    private boolean paused;
+    //是否正在录音
     private boolean isRecording;
 
     private Object mutex = new Object();
 
     public AudioRecordHandler(String filePath) {
         this.filePath = filePath;
-        this.encoder = new Encoder.Builder(44100, 1, 44100, 16).create();
+        this.encoder = new Encoder.Builder(SAMPLERATEINHZ, CHANNELCONFIG, SAMPLERATEINHZ, 320).create();
     }
 
     @Override
@@ -61,36 +64,43 @@ public class AudioRecordHandler implements Runnable {
 
         try {
             outputStream = new FileOutputStream(new File(filePath));
-
+            audioRecord = new AudioRecord(AUDIOSOURCE, SAMPLERATEINHZ, CHANNELCONFIG, AUDIOFORMAT, bufferSize);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
+            //todo:通知录音失败
+            return;
+        } catch (IllegalArgumentException e) {
+            e.printStackTrace();
+            //todo:通知录音失败
+            return;
         }
 
-        audioRecord = new AudioRecord(AUDIOSOURCE, SAMPLERATEINHZ, CHANNELCONFIG, AUDIOFORMAT, bufferSize);
-        //5 seconds data
         short[] buffer = new short[SAMPLERATEINHZ * 2 * 5];
-
-        // 'mp3buf' should be at least 7200 bytes long to hold all possible emitted data.
         byte[] mp3buffer = new byte[(int) (7200 + buffer.length * 2 * 1.25)];
-
 
         audioRecord.startRecording();
 
         int bufferRead = 0;
 
         while (isRecording) {
+
+            while (this.isPaused()) {
+                try {
+                    Log.i(TAG, "is pause");
+                    Thread.sleep(20);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+
             bufferRead = audioRecord.read(buffer, 0, bufferSize);
-            Log.d(TAG, "bytes read=" + bufferRead);
 
             if (bufferRead > 0) {
-
                 Log.d(TAG, "encoding bytes to mp3 buffer..");
                 int bytesEncoded = encoder.encode(buffer, buffer, bufferRead, mp3buffer);
-                Log.d(TAG, "bytes encoded=" + bytesEncoded);
 
                 if (bytesEncoded > 0) {
                     try {
-                        Log.d(TAG, "writing mp3 buffer to outputstream with " + bytesEncoded + " bytes");
                         outputStream.write(mp3buffer, 0, bytesEncoded);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -103,11 +113,8 @@ public class AudioRecordHandler implements Runnable {
 
         if (outputMp3buf > 0) {
             try {
-                Log.d(TAG, "writing final mp3buffer to outputstream");
                 outputStream.write(mp3buffer, 0, outputMp3buf);
-                Log.d(TAG, "closing output stream");
                 outputStream.close();
-                Log.d(TAG, "Output recording saved in " + filePath);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -118,7 +125,20 @@ public class AudioRecordHandler implements Runnable {
 
         encoder.close();
 
+
         isRecording = false;
+    }
+
+    public void setPaused(boolean paused) {
+        synchronized (mutex) {
+            this.paused = paused;
+        }
+    }
+
+    public boolean isPaused() {
+        synchronized (mutex) {
+            return paused;
+        }
     }
 
     public void setRecording(boolean isRec) {
