@@ -46,17 +46,19 @@ public class AudioRecordHandler implements Runnable {
 
     private FileOutputStream outputStream;
 
+    private Object mutex = new Object();
+
     //是否暂停
     private boolean paused;
     //是否正在录音
     private boolean isRecording;
 
-    private Object mutex = new Object();
-
-    public AudioRecordHandler(String filePath) {
+    public AudioRecordHandler(String filePath, ProgressListener progressListener) {
         this.filePath = filePath;
+        this.mProgressListener = progressListener;
         this.encoder = new Encoder.Builder(SAMPLERATEINHZ, CHANNELCONFIG, SAMPLERATEINHZ, 320).create();
     }
+
 
     @Override
     public void run() {
@@ -81,6 +83,7 @@ public class AudioRecordHandler implements Runnable {
         audioRecord.startRecording();
 
         int bufferRead = 0;
+        int duration = 0;
 
         while (isRecording) {
 
@@ -95,8 +98,14 @@ public class AudioRecordHandler implements Runnable {
 
             bufferRead = audioRecord.read(buffer, 0, bufferSize);
 
+            if (!mProgressListener.reportProgress(duration / SAMPLERATEINHZ)) {
+                break;
+            }
+
             if (bufferRead > 0) {
-                Log.d(TAG, "encoding bytes to mp3 buffer..");
+                duration += bufferRead;
+
+                Log.d(TAG, "encoding bytes to mp3 buffer......duration=" + duration);
                 int bytesEncoded = encoder.encode(buffer, buffer, bufferRead, mp3buffer);
 
                 if (bytesEncoded > 0) {
@@ -106,6 +115,9 @@ public class AudioRecordHandler implements Runnable {
                         e.printStackTrace();
                     }
                 }
+            } else {
+                release();
+                break;
             }
         }
 
@@ -120,13 +132,17 @@ public class AudioRecordHandler implements Runnable {
             }
         }
 
+        release();
+    }
+
+    private void release() {
         audioRecord.stop();
         audioRecord.release();
 
         encoder.close();
 
-
         isRecording = false;
+        audioRecord = null;
     }
 
     public void setPaused(boolean paused) {
@@ -145,5 +161,13 @@ public class AudioRecordHandler implements Runnable {
         synchronized (mutex) {
             this.isRecording = isRec;
         }
+    }
+
+    private ProgressListener mProgressListener;
+
+    // Progress listener interface.
+    public interface ProgressListener {
+
+        boolean reportProgress(double fractionComplete);
     }
 }

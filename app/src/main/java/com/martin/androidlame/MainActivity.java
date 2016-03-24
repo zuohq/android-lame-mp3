@@ -1,9 +1,11 @@
 package com.martin.androidlame;
 
+import android.Manifest;
 import android.os.Bundle;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ImageView;
@@ -18,9 +20,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int IDLE = 0;
     private static final int RECORDING = 1;
-
-    @InjectView(R.id.recycler_view)
-    RecyclerView mRecyclerView;
+    private static final String TAG = MainActivity.class.getSimpleName();
 
     @InjectView(R.id.toolbar)
     Toolbar toolbar;
@@ -55,12 +55,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void doActionRecord() {
+        int permissionCheck = ContextCompat.checkSelfPermission(this,
+                Manifest.permission.RECORD_AUDIO);
+        Log.i(TAG, "i =" + permissionCheck);
         //开始录音
-        mAudioRecordInstance = new AudioRecordHandler("/sdcard/hello.mp3");
+        mAudioRecordInstance = new AudioRecordHandler("/sdcard/hello.mp3", new AudioRecordHandler.ProgressListener() {
+            @Override
+            public boolean reportProgress(double fractionComplete) {
+//                Log.i(TAG, "duration = " + fractionComplete);
+                return true;
+            }
+        });
         Thread th = new Thread(mAudioRecordInstance);
         th.start();
         mAudioRecordInstance.setRecording(true);
     }
+
 
     @Override
     protected void onDestroy() {
