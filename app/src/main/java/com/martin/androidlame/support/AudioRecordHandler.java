@@ -53,10 +53,12 @@ public class AudioRecordHandler implements Runnable {
     //是否正在录音
     private boolean isRecording;
 
+    private int recordTime;
+
     public AudioRecordHandler(String filePath, ProgressListener progressListener) {
         this.filePath = filePath;
         this.mProgressListener = progressListener;
-        this.encoder = new Encoder.Builder(SAMPLERATEINHZ, CHANNELCONFIG, SAMPLERATEINHZ, 320).create();
+        this.encoder = new Encoder.Builder(SAMPLERATEINHZ, CHANNELCONFIG, SAMPLERATEINHZ, 16).create();
     }
 
 
@@ -74,6 +76,7 @@ public class AudioRecordHandler implements Runnable {
         } catch (IllegalArgumentException e) {
             e.printStackTrace();
             //todo:通知录音失败
+            releaseAndCloseStream();
             return;
         }
 
@@ -87,9 +90,10 @@ public class AudioRecordHandler implements Runnable {
 
         while (isRecording) {
 
-            while (this.isPaused()) {
+            while (isPaused()) {
                 try {
-                    Log.i(TAG, "is pause");
+                    if (!isRecording)
+                        break;
                     Thread.sleep(20);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -97,8 +101,11 @@ public class AudioRecordHandler implements Runnable {
             }
 
             bufferRead = audioRecord.read(buffer, 0, bufferSize);
+            recordTime = duration / SAMPLERATEINHZ;
 
-            if (!mProgressListener.reportProgress(duration / SAMPLERATEINHZ)) {
+            Log.i(TAG, "record time =" + recordTime);
+
+            if (isRecording && !mProgressListener.reportProgress(recordTime)) {
                 break;
             }
 
@@ -116,8 +123,9 @@ public class AudioRecordHandler implements Runnable {
                     }
                 }
             } else {
-                release();
-                break;
+                releaseAndCloseStream();
+                //todo:通知录音失败
+                return;
             }
         }
 
@@ -133,6 +141,16 @@ public class AudioRecordHandler implements Runnable {
         }
 
         release();
+    }
+
+    private void releaseAndCloseStream() {
+        try {
+            if (outputStream != null)
+                outputStream.close();
+            release();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void release() {
@@ -163,7 +181,17 @@ public class AudioRecordHandler implements Runnable {
         }
     }
 
+    public boolean isRecording() {
+        synchronized (mutex) {
+            return isRecording;
+        }
+    }
+
     private ProgressListener mProgressListener;
+
+    public int getRecordTime() {
+        return recordTime;
+    }
 
     // Progress listener interface.
     public interface ProgressListener {

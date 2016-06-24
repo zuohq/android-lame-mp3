@@ -6,8 +6,7 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
+import android.widget.EditText;
 import android.widget.ImageView;
 
 import com.martin.androidlame.support.AudioRecordHandler;
@@ -25,8 +24,11 @@ public class MainActivity extends AppCompatActivity {
     @InjectView(R.id.toolbar)
     Toolbar toolbar;
 
-    @InjectView(R.id.fab)
+    @InjectView(R.id.btn_record)
     ImageView mBtnRecord;
+
+    @InjectView(R.id.et_path)
+    EditText mPath;
 
     private int status = IDLE;
 
@@ -41,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
     }
 
-    @OnClick(R.id.fab)
+    @OnClick(R.id.btn_record)
     public void onRecordClick() {
         if (status == IDLE) {
             doActionRecord();
@@ -59,13 +61,14 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.RECORD_AUDIO);
         Log.i(TAG, "i =" + permissionCheck);
         //开始录音
-        mAudioRecordInstance = new AudioRecordHandler("/sdcard/hello.mp3", new AudioRecordHandler.ProgressListener() {
-            @Override
-            public boolean reportProgress(double fractionComplete) {
-//                Log.i(TAG, "duration = " + fractionComplete);
-                return true;
-            }
-        });
+        mAudioRecordInstance = new AudioRecordHandler("/sdcard/hello.mp3",
+                new AudioRecordHandler.ProgressListener() {
+                    @Override
+                    public boolean reportProgress(double duration) {
+                        Log.i(TAG, "duration = " + duration);
+                        return true;
+                    }
+                });
         Thread th = new Thread(mAudioRecordInstance);
         th.start();
         mAudioRecordInstance.setRecording(true);
@@ -84,22 +87,5 @@ public class MainActivity extends AppCompatActivity {
         if (mAudioRecordInstance != null) {
             mAudioRecordInstance.setRecording(false);
         }
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
     }
 }
